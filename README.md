@@ -1,0 +1,1 @@
+# azure-iot-edge-integration-test-template
