@@ -1,0 +1,124 @@
+parameters:
+- name: azureSvcName
+  type: string
+- name: vmSshSvcName
+  type: string
+- name: EdgeImages
+  type: object
+  default: []
+
+stages:
+- stage: TestPrep
+  jobs:
+  - job: TestPrep
+    variables:
+    - template: ./variables.yml
+    steps:
+    - ${{ each EdgeImage in parameters.EdgeImages }}:
+      - task: AzureCLI@2
+        displayName: Check ${{ EdgeImage.value.name }} image in ACR
+        inputs:
+          azureSubscription: ${{ parameters.azureSvcName }}
+          scriptType: bash
+          failOnStandardError: true
+          scriptLocation: inlineScript
+          inlineScript: |
+            az acr repository show --name $(ACR_NAME) --image ${{ EdgeImage.value.repository }}:${{ EdgeImage.value.tag }}
+    - task: AzureCLI@2
+      displayName: Start VM and IoT Edge runtime
+      inputs:
+        azureSubscription: ${{ parameters.azureSvcName }}
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az vm start --resource-group $(RESOURCE_GROUP_NAME) --name $(VM_NAME)
+    - task: SSH@0
+      displayName: Set up VM directory
+      retryCountOnTaskFailure: 5
+      inputs:
+        sshEndpoint: ${{ parameters.vmSshSvcName }}
+        runOptions: inline
+        inline: |
+          if [ -d "/edge" ]
+          then
+            sudo rm -r /edge
+          fi
+
+          sudo mkdir -p $(FILE_UPLOADER_DIR)
+          sudo chown -R 1000 $(FILE_UPLOADER_DIR)
+          sudo chmod -R 700 $(FILE_UPLOADER_DIR)
+
+          sudo mkdir -p $(FILE_UPDATER_DIR)
+          sudo chown -R 1000 $(FILE_UPDATER_DIR)
+          sudo chmod -R 700 $(FILE_UPDATER_DIR)
+
+          sudo mkdir -p $(LOCAL_BLOB_STORAGE_DIR)
+          sudo chown -R 11000:11000 $(LOCAL_BLOB_STORAGE_DIR)
+          sudo chmod -R 700 $(LOCAL_BLOB_STORAGE_DIR)
+
+          sudo apt-get install tree
+          tree /edge
+
+          sudo iotedge system restart
+
+    - task: AzureCLI@2
+      displayName: Extract credentials
+      inputs:
+        azureSubscription: ${{ parameters.azureSvcName }}
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az extension add --name azure-iot
+          iothubcs=$(az iot hub connection-string show --hub-name $(IOTHUB_NAME) -o tsv)
+          echo "##vso[task.setvariable variable=iotHubCs]$iothubcs"
+          acrkey=$(az acr credential show --name $(ACR_NAME) --query passwords[0].value -o tsv)
+          echo "##vso[task.setvariable variable=AcrKey]$acrkey"
+          storagekey=$(az storage account keys list --resource-group $(RESOURCE_GROUP_NAME) --account-name $(STORAGE_ACCOUNT_NAME) --query [0].value -o tsv)
+          echo "##vso[task.setvariable variable=storageAccountKey]$storagekey"
+          localstoragekey=$(openssl rand -base64 16)
+          echo "##vso[task.setvariable variable=LocalStorageKey]$localstoragekey"
+    - task: UseDotNet@2
+      displayName: Use .NET 6 SDK
+      inputs:
+        version: 6.0.x
+    - task: DotNetCoreCLI@2
+      displayName: Generate/deploy IoT Edge manifest
+      inputs:
+        command: run
+        projects: $(Build.SourcesDirectory)/src/apps/ManifestGenerator/ManifestGenerator/ManifestGenerator.csproj
+        arguments: --configuration Release
+      env:
+        STORAGE_ACCOUNT_NAME: $(STORAGE_ACCOUNT_NAME)
+        STORAGE_ACCOUNT_KEY: $(storageAccountKey)
+        ACR_NAME: $(ACR_NAME)
+        ACR_PASS: $(AcrKey)
+        IOTHUB_CONNECTOR_IMAGE: $(ACR_NAME).azurecr.io/${{ parameters.EdgeImages.module1.repository }}:${{ parameters.EdgeImages.module1.tag }}
+        WEATHER_OBSERVER_IMAGE: $(ACR_NAME).azurecr.io/${{ parameters.EdgeImages.module2.repository }}:${{ parameters.EdgeImages.module2.tag }}
+        FILE_GENERATOR_IMAGE: $(ACR_NAME).azurecr.io/${{ parameters.EdgeImages.module3.repository }}:${{ parameters.EdgeImages.module3.tag }}
+        FILE_UPLOADER_IMAGE: $(ACR_NAME).azurecr.io/${{ parameters.EdgeImages.module4.repository }}:${{ parameters.EdgeImages.module4.tag }}
+        FILE_UPDATER_IMAGE: $(ACR_NAME).azurecr.io/${{ parameters.EdgeImages.module5.repository }}:${{ parameters.EdgeImages.module5.tag }}
+        IOTHUB_DEVICE_ID: $(IOTHUB_DEVICE_ID)
+        IOTHUB_CONNECTION_STRING: $(iotHubCs)
+        LOCAL_STORAGE_KEY: $(LocalStorageKey)
+        ORGANIZATION_NAME: $(TEST_ORGANIZATION_NAME)
+    - ${{ each EdgeImage in parameters.EdgeImages }}:
+      - task: AzureCLI@2
+        displayName: Check ${{ EdgeImage.value.name }} status
+        inputs:
+          azureSubscription: ${{ parameters.azureSvcName }}
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            for ((i=0; ; i++))
+            do
+              status=$(az iot hub module-twin show --hub-name $(IOTHUB_NAME) --device-id $(IOTHUB_DEVICE_ID) --module-id '$edgeAgent' --query 'properties.reported.modules.${{ EdgeImage.value.name }}.runtimeStatus' | tr -d \")
+              echo -e "\n ${{ EdgeImage.value.name }}: $status"
+              if [[ $status = 'running' ]]; then
+                break
+              else
+                if [[ i -gt 10 ]]; then
+                  exit 1
+                fi
+                sleep 30
+              fi
+            done

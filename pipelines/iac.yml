@@ -1,0 +1,30 @@
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- template: ./templates/variables.yml
+- group: vg-edge-test
+- name: BicepFilePath
+  value: $(Build.SourcesDirectory)/src/bicep/main.bicep
+- name: BicepParameterFilePath
+  value: $(Build.SourcesDirectory)/src/bicep/main.parameters.json
+
+stages:
+- stage: DeployResource
+  jobs:
+  - job: DeployResource
+    steps:
+    - task: AzureCLI@2
+      displayName: Deploy Bicep template
+      inputs:
+        azureSubscription: $(AZURE_SVC_NAME)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
+          az deployment group create --resource-group $(RESOURCE_GROUP_NAME) --template-file $(BicepFilePath) \
+            --parameters $(BicepParameterFilePath) \
+              base_name=$(BASE_NAME) \
+              vm_pass=$(VM_PASS)

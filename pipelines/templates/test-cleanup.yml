@@ -1,0 +1,28 @@
+parameters:
+- name: azureSvcName
+  type: string
+
+stages:
+- stage: TestCleanup
+  jobs:
+  - job: TestCleanup
+    variables:
+    - template: ./variables.yml
+    steps:
+    - task: AzureCLI@2
+      displayName: Clean up test environment
+      inputs:
+        azureSubscription: ${{ parameters.azureSvcName }}
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az vm stop --resource-group $(RESOURCE_GROUP_NAME) --name $(VM_NAME)
+    - task: AzureCLI@2
+      displayName: Remove test blob
+      inputs:
+        azureSubscription: ${{ parameters.azureSvcName }}
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az config set extension.use_dynamic_install=yes_without_prompt
+          az storage blob directory delete --account-name $(STORAGE_ACCOUNT_NAME) --container-name $(BLOB_CONTAINER_NAME) --directory-path $(TEST_ORGANIZATION_NAME) --recursive

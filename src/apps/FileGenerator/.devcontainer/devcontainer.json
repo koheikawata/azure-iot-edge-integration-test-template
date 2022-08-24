@@ -1,0 +1,9 @@
+{
+  "name": "ROS devcontainer",
+  "dockerFile": "Dockerfile",
+  "workspaceFolder": "/workspaces/EdgeIntegrationTest/src/apps/FileGenerator",
+  "settings": {},
+  "extensions": [
+		"ms-python.python"
+	]
+}

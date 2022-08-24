@@ -1,0 +1,72 @@
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- group: vg-edge-test
+
+stages:
+- template: ./templates/edge-module.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+    moduleName: IothubConnector
+    dockerfileDirectory: $(Build.SourcesDirectory)/src/apps/IothubConnector
+    repositoryName: iothub-connector
+- template: ./templates/edge-module.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+    moduleName: WeatherObserver
+    dockerfileDirectory: $(Build.SourcesDirectory)/src/apps/WeatherObserver/WeatherObserver
+    repositoryName: weather-observer
+- template: ./templates/edge-module.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+    moduleName: FileGenerator
+    dockerfileDirectory: $(Build.SourcesDirectory)/src/apps/FileGenerator
+    repositoryName: file-generator
+- template: ./templates/edge-module.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+    moduleName: FileUploader
+    dockerfileDirectory: $(Build.SourcesDirectory)/src/apps/FileUploader/FileUploader
+    repositoryName: file-uploader
+- template: ./templates/edge-module.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+    moduleName: FileUpdater
+    dockerfileDirectory: $(Build.SourcesDirectory)/src/apps/FileUpdater/FileUpdater
+    repositoryName: file-updater
+- template: ./templates/test-prep.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+    vmSshSvcName: $(VM_SVC_NAME)
+    EdgeImages:
+      module1:
+        name: IothubConnector
+        repository: iothub-connector
+        tag: $(Build.BuildNumber)
+      module2:
+        name: WeatherObserver
+        repository: weather-observer
+        tag: $(Build.BuildNumber)
+      module3:
+        name: FileGenerator
+        repository: file-generator
+        tag: $(Build.BuildNumber)
+      module4:
+        name: FileUploader
+        repository: file-uploader
+        tag: $(Build.BuildNumber)
+      module5:
+        name: FileUpdater
+        repository: file-updater
+        tag: $(Build.BuildNumber)
+- template: ./templates/test-execution.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+    vmSshSvcName: $(VM_SVC_NAME)
+- template: ./templates/test-cleanup.yml
+  parameters:
+    azureSvcName: $(AZURE_SVC_NAME)
+

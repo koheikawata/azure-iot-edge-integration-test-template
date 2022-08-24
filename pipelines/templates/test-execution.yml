@@ -1,0 +1,90 @@
+parameters:
+- name: azureSvcName
+  type: string
+- name: vmSshSvcName
+  type: string
+
+stages:
+- stage: TestExecution
+  jobs:
+  - job: TestExecution
+    variables:
+    - template: ./variables.yml
+    steps:
+    - task: AzureCLI@2
+      displayName: Execute weather report integration test
+      inputs:
+        azureSubscription: ${{ parameters.azureSvcName }}
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az extension add --name azure-iot
+          az iot hub invoke-module-method --hub-name $(IOTHUB_NAME) --device-id $(IOTHUB_DEVICE_ID) --module-id IothubConnector --method-name request_weather_report --method-payload '{"city": "Tokyo"}' &
+          testResult=$(az iot hub monitor-events --hub-name $(IOTHUB_NAME) --device-id $(IOTHUB_DEVICE_ID) --module-id IothubConnector --cg $(IOTHUB_CONSUMER_GROUP) --timeout 30 -y)
+          echo "$testResult"
+          if [[ "$testResult" == *Japan* ]]; then
+            echo -e "\n\n\nSuccessfully found message at IoT Hub"
+          else
+            echo -e "\n\n\nFailed to find message at IoT Hub"
+            exit 1
+          fi
+          for ((i=0; ; i++))
+          do
+            fileUploadResult=$(az storage blob list --account-name $(STORAGE_ACCOUNT_NAME) --container-name $(BLOB_CONTAINER_NAME) --query "[?contains(name,'Tokyo')].name" | tr -d '\"[]{} \n')
+            echo "$fileUploadResult"
+            if [[ "$fileUploadResult" == *Tokyo*  ]]; then
+              echo -e "\n\nFound the test result -- $fileUploadResult"
+              break
+            else
+              if [[ i -gt 2 ]]; then
+                echo -e "\n\nNo blob is found"
+                echo "The test failed and stopped the pipeline"
+                exit 1
+              fi
+              echo -e "\n\nBlob is not uploaded yet"
+              echo -e "Trying again... \n\n"
+              sleep 20
+            fi
+          done
+    - task: AzureCLI@2
+      displayName: Execute download integration test
+      inputs:
+        azureSubscription: ${{ parameters.azureSvcName }}
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          zip1=/temp/Tokyo.zip
+
+          sudo mkdir /temp
+          cd /temp
+          sudo touch Tokyo2022.txt Tokyo2021.txt
+          sudo zip -r $zip1 Tokyo2022.txt Tokyo2021.txt
+          az storage blob upload --account-name $(STORAGE_ACCOUNT_NAME) --container-name $(BLOB_CONTAINER_NAME) --name $(TEST_FILE_BLOB_PATH) --file $zip1 --overwrite
+
+          end=`date -u -d "30 minutes" '+%Y-%m-%dT%H:%MZ'`
+          sas=$(az storage blob generate-sas --account-name $(STORAGE_ACCOUNT_NAME) --container-name $(BLOB_CONTAINER_NAME) --name $(TEST_FILE_BLOB_PATH) --permissions r --expiry $end --auth-mode login --as-user --full-uri | tr -d \")
+
+          az iot hub invoke-module-method --hub-name $(IOTHUB_NAME) --device-id $(IOTHUB_DEVICE_ID) --module-id IothubConnector --method-name request_download --method-payload \
+          '
+          {
+            "fileName" : "Tokyo.zip",
+            "blobSasUrl": "'${sas}'"
+          }
+          ' &
+          testResult=$(az iot hub monitor-events --hub-name $(IOTHUB_NAME) --device-id $(IOTHUB_DEVICE_ID) --module-id IothubConnector --cg $(IOTHUB_CONSUMER_GROUP) --timeout 30 -y)
+          echo "$testResult"
+          if [[ "$testResult" == *succeeded* ]]; then
+            echo -e "\n\n\nSuccessfully found download message at IoT Hub"
+          else
+            echo -e "\n\n\nFailed to find download message at IoT Hub"
+            exit 1
+          fi
+    - task: SSH@0
+      displayName: Check VM directory
+      retryCountOnTaskFailure: 5
+      inputs:
+        sshEndpoint: ${{ parameters.vmSshSvcName }}
+        runOptions: inline
+        inline: |
+          sudo apt-get install tree
+          tree /edge

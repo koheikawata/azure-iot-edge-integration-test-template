@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vnet_address_prefix": { "value": "10.0.0.0/16" },
+    "subnet_address_prefix": { "value": "10.0.0.0/24" },
+    "vm_size": { "value": "Standard_D2s_v3" },
+    "os_disk_type": { "value": "Standard_LRS" },
+    "ubuntu_os_version": { "value": "20_04-lts-gen2" },
+    "vm_username": { "value": "testuser" },
+    "iothub_cg_name": { "value": "edge-test-cg" }
+  }
+}

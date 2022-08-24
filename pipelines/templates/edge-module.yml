@@ -1,0 +1,29 @@
+parameters:
+- name: azureSvcName
+  type: string
+- name: moduleName
+  type: string
+- name: dockerfileDirectory
+  type: string
+- name: repositoryName
+  type: string
+
+stages:
+- stage: ${{ parameters.moduleName }}
+  jobs:
+  - job: DockerBuildPush
+    variables:
+    - template: ./variables.yml
+    steps:
+    - task: AzureCLI@2
+      displayName: Docker build and push
+      inputs:
+        azureSubscription: ${{ parameters.azureSvcName }}
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          acrkey=$(az acr credential show --name $(ACR_NAME) --query passwords[0].value -o tsv)
+          cd ${{ parameters.dockerfileDirectory }}
+          docker login -u $(ACR_NAME) -p $acrkey $(ACR_NAME).azurecr.io
+          docker build --rm -f Dockerfile -t $(ACR_NAME).azurecr.io/${{ parameters.repositoryName }}:$(Build.BuildNumber) .
+          docker push $(ACR_NAME).azurecr.io/${{ parameters.repositoryName }}:$(Build.BuildNumber)

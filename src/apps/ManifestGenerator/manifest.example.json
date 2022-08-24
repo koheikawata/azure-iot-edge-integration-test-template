@@ -1,0 +1,196 @@
+{
+  "ModulesContent": {
+    "$edgeHub": {
+      "properties.desired": {
+        "schemaVersion": "1.1",
+        "routes": {
+          "route_telemetry": "FROM /messages/modules/IothubConnector/outputs/telemetry INTO $upstream",
+          "route_c2w": "FROM /messages/modules/IothubConnector/outputs/reportRequest INTO BrokeredEndpoint(\"/modules/WeatherObserver/inputs/reportRequest\")",
+          "route_w2c": "FROM /messages/modules/WeatherObserver/outputs/reportResponse INTO BrokeredEndpoint(\"/modules/IothubConnector/inputs/reportResponse\")",
+          "route_w2u": "FROM /messages/modules/IothubConnector/outputs/updateRequest INTO BrokeredEndpoint(\"/modules/FileUpdater/inputs/updateRequest\")",
+          "route_u2w": "FROM /messages/modules/FileUpdater/outputs/updateResponse INTO BrokeredEndpoint(\"/modules/IothubConnector/inputs/updateResponse\")"
+        },
+        "storeAndForwardConfiguration": {
+          "timeToLiveSecs": 7200
+        }
+      }
+    },
+    "$edgeAgent": {
+      "properties.desired": {
+        "schemaVersion": "1.1",
+        "runtime": {
+          "type": "docker",
+          "settings": {
+            "loggingOptions": "",
+            "minDockerVersion": "v1.25",
+            "registryCredentials": {
+              "crsample1": {
+                "address": "crsample1.azurecr.io",
+                "username": "crsample1",
+                "password": "{ACR KEY}"
+              }
+            }
+          }
+        },
+        "systemModules": {
+          "edgeAgent": {
+            "type": "docker",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-agent:1.3",
+              "createOptions": ""
+            }
+          },
+          "edgeHub": {
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-hub:1.3",
+              "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"443/tcp\":[{\"HostPort\":\"443\"}],\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}]}}}"
+            }
+          }
+        },
+        "modules": {
+          "IothubConnector": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "crsample1.azurecr.io/iothub-connector:20220818.2",
+              "createOptions": ""
+            },
+            "env": {
+              "ROS_TOPIC_NAME": {
+                "value": "ros2_topic_download"
+              }
+            }
+          },
+          "WeatherObserver": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "crsample1.azurecr.io/weather-observer:20220818.2",
+              "createOptions": ""
+            },
+            "env": {}
+          },
+          "FileGenerator": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "crsample1.azurecr.io/file-generator:20220818.2",
+              "createOptions": "{\"HostConfig\":{\"Binds\":[\"/edge/upload/reports:/genroot\"]}}"
+            },
+            "env": {
+              "OUTPUT_DIRECTORY_PATH": {
+                "value": "/genroot"
+              },
+              "ROS_TOPIC_NAME": {
+                "value": "ros2_topic_download"
+              }
+            }
+          },
+          "FileUploader": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "crsample1.azurecr.io/file-uploader:20220818.2",
+              "createOptions": "{\"HostConfig\":{\"Binds\":[\"/edge/upload:/uploadroot\"]}}"
+            },
+            "env": {
+              "LOCAL_STORAGE_ACCOUNT_NAME": {
+                "value": "stlocal"
+              },
+              "LOCAL_STORAGE_ACCOUNT_KEY": {
+                "value": "{LOCAL STORAGE KEY}"
+              },
+              "LOCAL_STORAGE_BLOB_ENDPOINT": {
+                "value": "http://LocalBlobStorage:11002"
+              },
+              "WORKDIR": {
+                "value": "/uploadroot"
+              }
+            }
+          },
+          "FileUpdater": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "crsample1.azurecr.io/file-updater:20220818.2",
+              "createOptions": "{\"HostConfig\":{\"Binds\":[\"/edge/download:/downloadroot\"]}}"
+            },
+            "env": {
+              "WORKDIR": {
+                "value": "/downloadroot"
+              }
+            }
+          },
+          "LocalBlobStorage": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azure-blob-storage:latest",
+              "createOptions": "{\"HostConfig\":{\"Binds\":[\"/edge/localblob:/blobroot\"],\"PortBindings\":{\"11002/tcp\":[{\"HostPort\":\"11002\"}]}}}"
+            },
+            "env": {
+              "LOCAL_STORAGE_ACCOUNT_NAME": {
+                "value": "stlocal"
+              },
+              "LOCAL_STORAGE_ACCOUNT_KEY": {
+                "value": "{LOCAL STORAGE KEY}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "IothubConnector": {
+      "properties.desired": {}
+    },
+    "WeatherObserver": {
+      "properties.desired": {}
+    },
+    "FileGenerator": {
+      "properties.desired": {}
+    },
+    "FileUploader": {
+      "properties.desired": {}
+    },
+    "FileUpdater": {
+      "properties.desired": {}
+    },
+    "LocalBlobStorage": {
+      "properties.desired": {
+        "deviceAutoDeleteProperties": {
+          "deleteOn": true,
+          "deleteAfterMinutes": 5,
+          "retainWhileUploading": true
+        },
+        "deviceToCloudUploadProperties": {
+          "uploadOn": true,
+          "uploadOrder": "NewestFirst",
+          "deleteAfterUpload": true,
+          "cloudStorageConnectionString": "BlobEndpoint=https://stsample1.blob.core.windows.net/weather/testorg;SharedAccessSignature=sv=2021-08-06&se=2023-02-24T00%3A38%3A47Z&sr=d&sp=rcw&sdd=1&sig=xxxxxxxxxxxxxxxxxxxxxxxxx",
+          "storageContainersForUpload": {
+            "weather": {
+              "target": "IntegrationTest"
+            }
+          }
+        }
+      }
+    }
+  },
+  "ModuleContent": {},
+  "DeviceContent": {}
+}

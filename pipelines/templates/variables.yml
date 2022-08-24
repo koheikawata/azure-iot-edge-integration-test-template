@@ -1,0 +1,33 @@
+variables:
+- name: BASE_NAME
+  value: sample77
+- name: LOCATION
+  value: japaneast
+
+- name: RESOURCE_GROUP_NAME
+  value: rg-$(BASE_NAME)
+- name: STORAGE_ACCOUNT_NAME
+  value: st$(BASE_NAME)
+- name: ACR_NAME
+  value: cr$(BASE_NAME)
+- name: VM_NAME
+  value: ubuntu-$(BASE_NAME)
+- name: IOTHUB_NAME
+  value: iot-$(BASE_NAME)
+- name: IOTHUB_DEVICE_ID
+  value: IntegrationTest
+- name: IOTHUB_CONSUMER_GROUP
+  value: edge-test-cg
+
+- name: TEST_ORGANIZATION_NAME
+  value: testorg
+- name: TEST_FILE_BLOB_PATH
+  value: testorg/integrationtest/archive/Tokyo/Tokyo.zip
+- name: FILE_UPLOADER_DIR
+  value: /edge/upload/reports
+- name: FILE_UPDATER_DIR
+  value: /edge/download/archive
+- name: LOCAL_BLOB_STORAGE_DIR
+  value: /edge/localblob
+- name: BLOB_CONTAINER_NAME
+  value: weather
