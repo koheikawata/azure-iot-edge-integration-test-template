@@ -54,7 +54,7 @@
 
 - Azure DevOps -> Project settings -> Service connections -> New service connection
    - SSH -> Next
-     - Host name: `edge-{BASE_NAME}.japaneast.cloudapp.azure.com`
+     - Host name: `edge-{BASE_NAME}.{LOCATION}.cloudapp.azure.com`
      - Port number: 22
      - Username: `testuser`
      - Password: The one defined in the previous step
