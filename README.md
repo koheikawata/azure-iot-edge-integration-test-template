@@ -1,6 +1,12 @@
 # Azure IoT Edge Integration Test template
 This repository introduces a sample of how to create an integration test environment for [Azure IoT Edge](https://docs.microsoft.com/en-us/azure/iot-edge/about-iot-edge) modules. You can run the Infrastructure as Code (IaC) pipeline to deploy Azure resources required for the test and the integration test pipeline to set up a test environment and execute the test. Follow the instruction in [Getting-Started](./docs/getting-started.md) to deploy this template. Detailed module configurations are in [Module-Design](./docs/module-design.md).
 
+## Reference
+
+- [Azure IoT Edge Integration Test template - Part.1](https://dev.to/koheikawata/azure-iot-edge-integration-test-template-part1-3911)
+- [Azure IoT Edge Integration Test template - Part.2](https://dev.to/koheikawata/azure-iot-edge-integration-test-template-part2-378l)
+- [Azure IoT Edge Integration Test template - Part.3](https://dev.to/koheikawata/azure-iot-edge-integration-test-template-part3-5eld)
+
 # Use case
 
 When you have multiple Azure IoT Edge modules on an edge device and want to update codes of one of those modules, you can make sure the code quality by implementing linter and unit tests, but it is difficult to validate communications among modules. That is why executing integration tests every time you update the software. In this template, you can execute integration tests of Azure IoT Edge modules on Test Environment on Azure Virtual Machine. The test procedure is all automated by Azure Pipelines. [iac.yml](./pipelines/iac.yml) enables you to run the deployment of Azure resources for the integration tests and [integration-test.yml](./pipelines/integration-test.yml) to run the integration test preparation and execution.
